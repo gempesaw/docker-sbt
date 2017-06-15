@@ -1,4 +1,4 @@
-FROM 1science/sbt:0.13.8-oracle-jre-8
+FROM gafiatulin/alpine-sbt:latest
 
-# initialize sbt so we don't have to download it
+WORKDIR /app
 RUN sbt version
