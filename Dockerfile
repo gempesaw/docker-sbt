@@ -1,54 +1,48 @@
 FROM gafiatulin/alpine-sbt:latest
 
 #########
-# the following installs node & npm, via https://github.com/nodejs/docker-node/blob/61336a7bb2003f1a991dfd734a0afd71ae788335/8.1/alpine/Dockerfile
+# the following installs node & npm, via https://github.com/mhart/alpine-node/blob/60e0a808fe597193230441c9ebb86a5cc4ef1678/Dockerfile
 #########
 
-ENV NPM_CONFIG_LOGLEVEL info
-ENV NODE_VERSION 8.1.2
+ENV VERSION=v8.1.4 NPM_VERSION=5 YARN_VERSION=latest
 
-RUN addgroup -g 1000 node \
-    && adduser -u 1000 -G node -s /bin/sh -D node \
-    && apk add --no-cache \
-        libstdc++ \
-    && apk add --no-cache --virtual .build-deps \
-        binutils-gold \
-        curl \
-        g++ \
-        gcc \
-        gnupg \
-        libgcc \
-        linux-headers \
-        make \
-        python \
-  # gpg keys listed at https://github.com/nodejs/node#release-team
-  && for key in \
-    9554F04D7259F04124DE6B476D5A82AC7E37093B \
+RUN apk add --no-cache curl make gcc g++ python linux-headers binutils-gold gnupg libstdc++ && \
+  gpg --keyserver ha.pool.sks-keyservers.net --recv-keys \
     94AE36675C464D64BAFA68DD7434390BDBE9B9C5 \
     FD3A5288F042B6850C66B31F09FE44734EB7990E \
     71DCFD284A79C3B38668286BC97EC7A07EDE3FC1 \
     DD8F2338BAE7501E3DD5AC78C273792F7D83545D \
-    B9AE9905FFD7803F25714661B63B535A4C206CA9 \
     C4F0DFFF4E8C1A8236409D08E73BC641CC11F4C8 \
-    56730D5401028683275BD23C23EFEFE93C4CFFFE \
-  ; do \
-    gpg --keyserver pgp.mit.edu --recv-keys "$key" || \
-    gpg --keyserver keyserver.pgp.com --recv-keys "$key" || \
-    gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key" ; \
-  done \
-    && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION.tar.xz" \
-    && curl -SLO --compressed "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
-    && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
-    && grep " node-v$NODE_VERSION.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
-    && tar -xf "node-v$NODE_VERSION.tar.xz" \
-    && cd "node-v$NODE_VERSION" \
-    && ./configure \
-    && make -j$(getconf _NPROCESSORS_ONLN) \
-    && make install \
-    && apk del .build-deps \
-    && cd .. \
-    && rm -Rf "node-v$NODE_VERSION" \
-    && rm "node-v$NODE_VERSION.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt
+    B9AE9905FFD7803F25714661B63B535A4C206CA9 \
+    56730D5401028683275BD23C23EFEFE93C4CFFFE && \
+  curl -sSLO https://nodejs.org/dist/${VERSION}/node-${VERSION}.tar.xz && \
+  curl -sSL https://nodejs.org/dist/${VERSION}/SHASUMS256.txt.asc | gpg --batch --decrypt | \
+    grep " node-${VERSION}.tar.xz\$" | sha256sum -c | grep . && \
+  tar -xf node-${VERSION}.tar.xz && \
+  cd node-${VERSION} && \
+  ./configure --prefix=/usr ${CONFIG_FLAGS} && \
+  make -j$(getconf _NPROCESSORS_ONLN) && \
+  make install && \
+  cd / && \
+  if [ -z "$CONFIG_FLAGS" ]; then \
+    npm install -g npm@${NPM_VERSION} && \
+    find /usr/lib/node_modules/npm -name test -o -name .bin -type d | xargs rm -rf && \
+    if [ -n "$YARN_VERSION" ]; then \
+      gpg --keyserver ha.pool.sks-keyservers.net --recv-keys \
+        6A010C5166006599AA17F08146C2130DFD2497F5 && \
+      curl -sSL -O https://yarnpkg.com/${YARN_VERSION}.tar.gz -O https://yarnpkg.com/${YARN_VERSION}.tar.gz.asc && \
+      gpg --batch --verify ${YARN_VERSION}.tar.gz.asc ${YARN_VERSION}.tar.gz && \
+      mkdir /usr/local/share/yarn && \
+      tar -xf ${YARN_VERSION}.tar.gz -C /usr/local/share/yarn --strip 1 && \
+      ln -s /usr/local/share/yarn/bin/yarn /usr/local/bin/ && \
+      ln -s /usr/local/share/yarn/bin/yarnpkg /usr/local/bin/ && \
+      rm ${YARN_VERSION}.tar.gz*; \
+    fi; \
+  fi && \
+  apk del curl make gcc g++ python linux-headers binutils-gold gnupg ${DEL_PKGS} && \
+  rm -rf ${RM_DIRS} /node-${VERSION}* /usr/share/man /tmp/* /var/cache/apk/* \
+    /root/.npm /root/.node-gyp /root/.gnupg /usr/lib/node_modules/npm/man \
+    /usr/lib/node_modules/npm/doc /usr/lib/node_modules/npm/html /usr/lib/node_modules/npm/scripts
 
 WORKDIR /app
-RUN sbt version
+RUN sbt sbt-version
