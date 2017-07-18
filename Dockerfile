@@ -1,9 +1,9 @@
-FROM gafiatulin/alpine-sbt:latest
+FROM contentanalyst/java-bash:serverjre-8
 
+WORKDIR /root
 #########
 # the following installs node & npm, via https://github.com/mhart/alpine-node/blob/60e0a808fe597193230441c9ebb86a5cc4ef1678/Dockerfile
 #########
-
 ENV VERSION=v8.1.4 NPM_VERSION=5 YARN_VERSION=latest
 
 RUN apk add --no-cache curl make gcc g++ python linux-headers binutils-gold gnupg libstdc++ && \
@@ -44,5 +44,5 @@ RUN apk add --no-cache curl make gcc g++ python linux-headers binutils-gold gnup
     /root/.npm /root/.node-gyp /root/.gnupg /usr/lib/node_modules/npm/man \
     /usr/lib/node_modules/npm/doc /usr/lib/node_modules/npm/html /usr/lib/node_modules/npm/scripts
 
+RUN npm i -g newman wait-port
 WORKDIR /app
-RUN sbt sbt-version
